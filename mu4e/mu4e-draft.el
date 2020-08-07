@@ -40,6 +40,26 @@
   :type 'boolean
   :group 'mu4e-compose)
 
+(defcustom mu4e-compose-dont-move-recepients-to-cc nil
+  "Default behaviour of mu4e compose is to combine
+From: from@mail.com
+To: to1@mail.com, to2@mail.com
+Cc: cc1@mail.com, cc2@mail.com
+
+into
+
+From: my-reply-to@mail.com
+To: from@mail.com
+Cc: to1@mail.com, to2@mail.com, cc1@mail.com, cc2@mail.com
+
+If `mu4e-compose-dont-move-recepients-to-cc' is non-nil, Cc's will remain Cc's and To's remain To's:
+
+From: my-reply-to@mail.com
+To: from@mail.com, to1@mail.com, to2@mail.com
+Cc: cc1@mail.com, cc2@mail.com"
+  :type 'boolean
+  :group 'mu4e-compose)
+
 (defcustom mu4e-compose-cite-function
   (or message-cite-function 'message-cite-original-without-signature)
   "The function for citing message in replies and forwards.
@@ -169,15 +189,20 @@ form (NAME . EMAIL)."
    (downcase (or (cdr cell2) ""))))
 
 
-(defun mu4e~draft-create-to-lst (origmsg)
+(defun mu4e~draft-create-to-lst (origmsg &optional reply-all) ; [2020-07-25] alras - added  optional reply-all arg
   "Create a list of address for the To: in a new message.
 This is based on the original message ORIGMSG. If the Reply-To
 address is set, use that, otherwise use the From address. Note,
 whatever was in the To: field before, goes to the Cc:-list (if
 we're doing a reply-to-all). Special case: if we were the sender
 of the original, we simple copy the list form the original."
-  (let ((reply-to
-         (or (plist-get origmsg :reply-to) (plist-get origmsg :from))))
+  (let* ((reply-to (or (plist-get origmsg :reply-to) (plist-get origmsg :from)))
+	 ;;(reply-to (if (and mu4e-compose-dont-move-recepients-to-cc reply-all)   ; [2020-07-25] added check for keepewing recipients in To: field.
+	 (reply-to (if (and mu4e-compose-dont-move-recepients-to-cc)   ; [2020-07-25] added check for keepewing recipients in To: field.
+	       (append reply-to (plist-get origmsg :to))                 ;
+	       reply-to)
+           )
+         )
     (cl-delete-duplicates reply-to :test #'mu4e~draft-address-cell-equal)
     (if mu4e-compose-dont-reply-to-self
         (cl-delete-if
@@ -222,9 +247,9 @@ REPLY-ALL."
     (let* ((cc-lst ;; get the cc-field from the original, remove dups
             (cl-delete-duplicates
              (append
-              (plist-get origmsg :to)
+	      (when (not mu4e-compose-dont-move-recepients-to-cc) (plist-get origmsg :to)) ;[2020-07-25] added check appending only cc
               (plist-get origmsg :cc)
-              (when include-from(plist-get origmsg :from))
+              (when include-from (plist-get origmsg :from))
               (plist-get origmsg :list-post))
              :test #'mu4e~draft-address-cell-equal))
            ;; now we have the basic list, but we must remove
@@ -235,7 +260,7 @@ REPLY-ALL."
                (cl-find-if
                 (lambda (to-cell)
                   (mu4e~draft-address-cell-equal cc-cell to-cell))
-                (mu4e~draft-create-to-lst origmsg)))
+                (mu4e~draft-create-to-lst origmsg reply-all))) ;[2020-07-25] added reply-all arg
              cc-lst))
            ;; remove ignored addresses
            (cc-lst (mu4e~strip-ignored-addresses cc-lst))
@@ -261,7 +286,7 @@ message. Return nil if there are no recipients for the particular field."
   (mu4e~draft-recipients-list-to-string
    (cl-case field
      (:to
-      (mu4e~draft-create-to-lst origmsg))
+      (mu4e~draft-create-to-lst origmsg reply-all)) ;[2020-07-25] added reply-all arg
      (:cc
       (mu4e~draft-create-cc-lst origmsg reply-all include-from))
      (otherwise
@@ -371,7 +396,7 @@ never hits the disk. Also see
   "Ask user whether she wants to reply to *all* recipients.
 If there is just one recipient of ORIGMSG do nothing."
   (let* ((recipnum
-          (+ (length (mu4e~draft-create-to-lst origmsg))
+          (+ (length (mu4e~draft-create-to-lst origmsg t)) ; [2020-07-25] alras: added t for reply-all
              (length (mu4e~draft-create-cc-lst origmsg t))))
          (response
           (if (< recipnum 2)
@@ -429,7 +454,7 @@ You can append flags."
                                    (mu4e-message-field origmsg :cc))))
 
        ;; if there's no-one in To, copy the CC-list
-       (if (zerop (length (mu4e~draft-create-to-lst origmsg)))
+       (if (zerop (length (mu4e~draft-create-to-lst origmsg reply-all))) ;[2020-07-25] added reply-all arg
            (mu4e~draft-header "To" (mu4e~draft-recipients-construct
                                     :cc origmsg reply-all))
          ;; otherwise...
@@ -444,7 +469,7 @@ mailing-list."
          (list-post (plist-get origmsg :list-post))
          (from      (plist-get origmsg :from))
          (recipnum
-          (+ (length (mu4e~draft-create-to-lst origmsg))
+          (+ (length (mu4e~draft-create-to-lst origmsg t)) ;[2020-07-25] added t for reply-all arg
              (length (mu4e~draft-create-cc-lst origmsg t t))))
          (reply-type
           (mu4e-read-option
