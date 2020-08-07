@@ -206,6 +206,14 @@ but also manually invoked searches."
   :type 'hook
   :group 'mu4e-headers)
 
+
+(defcustom mu4e-headers-view-quit-hook nil
+  "Hook run just when quitting the headers view *before* the
+Mu4e main view is update. The idea is to allow for automatic
+synchronization of modified folders every time the headers
+view is closed."
+  :type 'hook
+  :group 'mu4e-headers)
 ;;; Public variables
 
 (defvar mu4e-headers-sort-field :date
@@ -1870,7 +1878,10 @@ other windows."
       ;; now, all *other* windows should be gone. kill ourselves, and return
       ;; to the main view
       (kill-buffer)
+      (run-hooks 'mu4e-headers-view-quit-hook)
       (mu4e~main-view 'refresh))))
+
+
 
 ;;; _
 (provide 'mu4e-headers)
