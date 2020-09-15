@@ -19,6 +19,8 @@
 
 #include "config.h"
 
+#include <array>
+
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -495,7 +497,8 @@ to_string (const Mu::Sexp& sexp, bool color, size_t level = 0)
         Mu::MaybeAnsi col{color};
         using Color = Mu::MaybeAnsi::Color;
 
-        constexpr std::array<Color, 6> rainbow = {
+        // clang/libc++ don't allow constexpr here
+        const std::array<Color, 6> rainbow = {
                 Color::BrightBlue, Color::Green, Color::Yellow,
                 Color::Magenta,    Color::Cyan,  Color::BrightGreen,
         };
