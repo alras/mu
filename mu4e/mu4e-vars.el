@@ -448,7 +448,10 @@ their canonical counterpart; useful as an example."
 (make-obsolete-variable 'mu4e-compose-complete-ignore-address-regexp
                         "mu4e-contact-process-function (see docstring)" "mu4e 1.3.2")
 
-(defcustom mu4e-contact-process-function nil
+(defcustom mu4e-contact-process-function
+  (lambda(addr) ;; filter-out no-reply addresses
+    (unless (string-match-p "no[t]?[-\\.]?repl\\(y\\|ies\\)" addr)
+      addr))
   "Function for processing contact information for use in auto-completion.
 
 The function receives the contact as a string, e.g
@@ -617,6 +620,16 @@ Unlike in search queries, folder names with spaces in them must
 NOT be quoted, since mu4e does this for you."
   :type '(repeat (cons (string :tag "Maildir") character))
   :version "1.3.9"
+  :group 'mu4e-folders)
+
+(defcustom mu4e-maildir-info-delimiter
+  (if (member system-type '(ms-dos windows-nt cygwin))
+      ";" ":")
+  "Separator character between message identifier and flags.
+It defaults to ':' on most platforms, except on Windows,
+where it is not allowed and we use ';' for compatibility
+with mbsync, offlineimap and other programs."
+  :type 'string
   :group 'mu4e-folders)
 
 
@@ -1039,9 +1052,14 @@ mu4e-compose.")
       (mu4e-error "database-path unknown; did you start mu4e?"))
     path))
 
-(defun mu4e-personal-addresses()
-  "Get the user's personal addresses, if any."
-  (when mu4e~server-props (plist-get mu4e~server-props :personal-addresses)))
+(defun mu4e-personal-addresses(&optional no-regexp)
+  "Get the list user's personal addresses, as passed to `mu init --my-address=...'.
+ The address are either plain e-mail address or /regular
+ expressions/. When NO_REGEXP is non-nil, do not include regexp
+ address patterns (if any)."
+  (seq-remove
+   (lambda(addr) (and no-regexp (string-match-p "^/.*/" addr)))
+   (when mu4e~server-props (plist-get mu4e~server-props :personal-addresses))))
 
 (defun mu4e-server-version()
   "Get the server version, which should match mu4e's."
@@ -1049,7 +1067,6 @@ mu4e-compose.")
     (unless version
       (mu4e-error "version unknown; did you start mu4e?"))
     version))
-
 
 
 ;;; Handler functions

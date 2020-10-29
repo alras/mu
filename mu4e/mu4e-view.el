@@ -270,7 +270,7 @@ found."
           (:from-or-to
            (let* ((from (mu4e-message-field msg :from))
                   (from (and from (cdar from))))
-             (if (mu4e-user-mail-address-p from)
+             (if (mu4e-personal-address-p from)
                  (mu4e~view-construct-contacts-header msg :to)
                (mu4e~view-construct-contacts-header msg :from))))
           ;; date
@@ -404,7 +404,8 @@ article-mode."
           (gnus-blocked-images ".") ;; don't load external images.
           ;; Possibly add headers (before "Attachments")
           (gnus-display-mime-function (mu4e~view-gnus-display-mime msg))
-          (gnus-icalendar-additional-identities (mu4e-personal-addresses)))
+          (gnus-icalendar-additional-identities
+           (mu4e-personal-addresses 'no-regexp)))
       (gnus-article-prepare-display))
     (setq mu4e~gnus-article-mime-handles gnus-article-mime-handles)
     (setq mu4e~view-message msg)

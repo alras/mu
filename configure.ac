@@ -15,7 +15,7 @@
 ## Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 AC_PREREQ([2.68])
-AC_INIT([mu],[1.5.5],[https://github.com/djcb/mu/issues],[mu])
+AC_INIT([mu],[1.5.6],[https://github.com/djcb/mu/issues],[mu])
 AC_COPYRIGHT([Copyright (C) 2008-2020 Dirk-Jan C. Binnema])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([mu/mu.cc])
@@ -122,7 +122,8 @@ AS_IF([test "x$ac_cv_member_struct_dirent_d_ino" != "xyes"],
 
 AC_CHECK_FUNCS([memset memcpy realpath setlocale strerror getpass setsid])
 AC_CHECK_FUNCS([vasprintf strptime])
-AC_CHECK_FUNC(timegm,[],AC_MSG_ERROR([missing required function timegm]))
+# timegm is no longer used in the source
+# AC_CHECK_FUNC(timegm,[],AC_MSG_ERROR([missing required function timegm]))
 
 # require pkg-config >= 0.28 (release in 2013; should be old enough...)
 # with that version, we don't need the AC_SUBST stuff after PKG_CHECK.
@@ -144,14 +145,6 @@ glib_version="$($PKG_CONFIG --modversion glib-2.0)"
 # gmime, version 3.0 or higher
 PKG_CHECK_MODULES(GMIME,gmime-3.0)
 gmime_version="$($PKG_CONFIG --modversion gmime-3.0)"
-
-# gmime, version 3.0 or higher
-PKG_CHECK_MODULES(JSON_GLIB,json-glib-1.0 >= 1.4,[have_json_glib=yes],[have_json_glib=no])
-AS_IF([test "x$have_json_glib" = "xyes"],[
-  json_glib_version="$($PKG_CONFIG --modversion json-glib-1.0)"
-  AC_DEFINE(HAVE_JSON_GLIB,[1], [Do we support json-glib?])
-])
-AM_CONDITIONAL(HAVE_JSON_GLIB,[test "x$have_json_glib" = "xyes"])
 
 # xapian checking - we need 1.4 at least
 PKG_CHECK_MODULES(XAPIAN,xapian-core >= 1.4,[
@@ -294,10 +287,6 @@ echo
 echo "Xapian version                       : $xapian_version"
 echo "GLib version                         : $glib_version"
 echo "GMime version                        : $gmime_version"
-
-AM_COND_IF([HAVE_JSON_GLIB],[
-echo "Json-Glib version                    : $json_glib_version"
-])
 
 AM_COND_IF([BUILD_GUI],[
 echo "GTK+ version                         : $gtk_version"

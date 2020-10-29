@@ -36,7 +36,7 @@
 
 (defcustom mu4e-compose-dont-reply-to-self nil
   "If non-nil, don't include self.
-\(that is, member of `(mu4e-personal-addresses)') in replies."
+(as decided by `mu4e-personal-address-p')"
   :type 'boolean
   :group 'mu4e-compose)
 
@@ -207,10 +207,7 @@ of the original, we simple copy the list form the original."
     (if mu4e-compose-dont-reply-to-self
         (cl-delete-if
          (lambda (to-cell)
-           (cl-member-if
-            (lambda (addr)
-              (string= (downcase addr) (downcase (cdr to-cell))))
-            (mu4e-personal-addresses)))
+           (mu4e-personal-address-p (cdr to-cell)))
          reply-to)
       reply-to)))
 
@@ -271,10 +268,7 @@ REPLY-ALL."
                 cc-lst
               (cl-delete-if
                (lambda (cc-cell)
-                 (cl-member-if
-                  (lambda (addr)
-                    (string= (downcase addr) (downcase (cdr cc-cell))))
-                  (mu4e-personal-addresses)))
+                 (mu4e-personal-address-p (cdr cc-cell)))
                cc-lst))))
       cc-lst)))
 
@@ -421,10 +415,10 @@ You can append flags."
                       (substring sysname
                                  (string-match "^[^.]+" sysname)
                                  (match-end 0))))))
-    (format "%s.%04x%04x%04x%04x.%s:2,%s"
+    (format "%s.%04x%04x%04x%04x.%s%s2,%s"
             (format-time-string "%s" (current-time))
             (random 65535) (random 65535) (random 65535) (random 65535)
-            hostname (or flagstr ""))))
+            hostname mu4e-maildir-info-delimiter (or flagstr ""))))
 
 (defun mu4e~draft-common-construct ()
   "Construct the common headers for each message."

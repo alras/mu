@@ -107,6 +107,15 @@ vertical split-view."
   :type 'integer
   :group 'mu4e-headers)
 
+(defcustom mu4e-headers-precise-alignment nil
+  "When set, use precise (but relatively slow) alignment for columns.
+By default, do it in a slightly inaccurate but faster way. To get
+an idea about the difference, In some tests, the rendering time
+was around 5.8 ms per messages for precise alignment, versus 3.3
+for non-precise aligment (for 445 messages)."
+  :type 'boolean
+  :group 'mu4e-headers)
+
 (defcustom mu4e-headers-auto-update t
   "Whether to automatically update the current headers buffer if an
 indexing operation showed changes."
@@ -335,9 +344,17 @@ In the format needed for `mu4e-read-option'.")
 
 ;;; Clear
 
+(defvar mu4e~headers-render-start nil)
+(defvar mu4e~headers-render-time  nil)
+
+(defvar mu4e-headers-report-render-time nil
+  "If non-nil, report on the time it took to render the messages.
+This is mostly useful for profiling.")
+
 (defun mu4e~headers-clear (&optional msg)
   "Clear the header buffer and related data structures."
   (when (buffer-live-p (mu4e-get-headers-buffer))
+    (setq mu4e~headers-render-start (float-time))
     (let ((inhibit-read-only t))
       (with-current-buffer (mu4e-get-headers-buffer)
         (mu4e~mark-clear)
@@ -606,11 +623,11 @@ cdr element the To: prefix.")
 
 (defun mu4e~headers-from-or-to (msg)
   "When the from address for message MSG is one of the the user's addresses,
-\(as per `mu4e-personal-addresses'), show the To address;
+\(as per `mu4e-personal-address-p'), show the To address;
 otherwise ; show the from address; prefixed with the appropriate
 `mu4e-headers-from-or-to-prefix'."
   (let ((addr (cdr-safe (car-safe (mu4e-message-field msg :from)))))
-    (if (mu4e-user-mail-address-p addr)
+    (if (and addr (mu4e-personal-address-p addr))
         (concat (cdr mu4e-headers-from-or-to-prefix)
                 (mu4e~headers-contact-str (mu4e-message-field msg :to)))
       (concat (car mu4e-headers-from-or-to-prefix)
@@ -689,12 +706,42 @@ found."
       (:size (mu4e-display-size val))
       (t (mu4e~headers-custom-field-value msg field)))))
 
-(defsubst mu4e~headers-truncate-field (val width)
-  "Truncate VAL to WIDTH."
+
+(defun mu4e~headers-truncate-field-fast (val width)
+  "Truncate VAL to WIDTH. Fast and somewhat inaccurate."
   (if width
       (truncate-string-to-width val width 0 ?\s truncate-string-ellipsis)
     val))
 
+
+
+(defun mu4e~headers-truncate-field-precise (field val width)
+  "Return VAL truncated to one less than WIDTH, with a trailing
+space propertized with a 'display text property which expands to
+ the correct column for display."
+  (when width
+    (let ((end-col (cl-loop for (f . w) in mu4e-headers-fields
+                            sum w
+                            until (equal f field))))
+      (setq val (string-trim-right val))
+      (if (> width (length val))
+          (setq val (concat val " "))
+	(setq val
+	      (concat
+	       (truncate-string-to-width val (1- width) 0 ?\s t)
+	       " ")))
+      (put-text-property (1- (length val))
+			 (length val)
+			 'display
+			 `(space . (:align-to ,end-col))
+			 val)))
+  val)
+
+(defsubst mu4e~headers-truncate-field (field val width)
+  "Truncate VAL to WIDTH."
+  (if mu4e-headers-precise-alignment
+      (mu4e~headers-truncate-field-precise field val width)
+    (mu4e~headers-truncate-field-fast val width)))
 
 (defcustom mu4e-headers-field-properties-function nil
   "Function that specifies custom text properties for a header field.
@@ -709,15 +756,13 @@ avoid slowdowns."
   :type 'function
   :group 'mu4e-headers)
 
-
 (defsubst mu4e~headers-field-handler (f-w msg)
   "Create a description of the field of MSG described by F-W."
-  (let* ((field-id (car f-w))
+  (let* ((field (car f-w))
          (width (cdr f-w))
-         (val (mu4e~headers-field-value msg field-id))
-         (val (if width (mu4e~headers-truncate-field val width) val)))
+         (val (mu4e~headers-field-value msg field))
+         (val (if width (mu4e~headers-truncate-field field val width) val)))
     val))
-
 
 (defsubst mu4e~headers-apply-flags (msg fieldval)
   "Adjust LINE's face property based on FLAGS."
@@ -770,34 +815,47 @@ if provided, or at the end of the buffer otherwise."
 (defun mu4e~headers-found-handler (count)
   "Create a one line description of the number of headers found
 after the end of the search results."
+
+  (when mu4e~headers-render-start ;; for benchmarking.
+    (setq mu4e~headers-render-time
+          (- (float-time) mu4e~headers-render-start)
+          mu4e~headers-render-start nil))
+  (message "%S" mu4e~headers-render-time)
   (when (buffer-live-p (mu4e-get-headers-buffer))
     (with-current-buffer (mu4e-get-headers-buffer)
       (save-excursion
         (goto-char (point-max))
         (let ((inhibit-read-only t)
-              (str (if (zerop count) mu4e~no-matches mu4e~end-of-results)))
+              (str (if (zerop count) mu4e~no-matches mu4e~end-of-results))
+              (msg (format "Found %d matching message%s"
+                           count (if (= 1 count) "" "s")))
+              (render-time-ms (when mu4e~headers-render-time
+                                (* mu4e~headers-render-time 1000))))
+          ;; benchmarking.
+          (when (and mu4e-headers-report-render-time (> count 0))
+            (setq msg (concat msg (format " (rendering took %0.1f ms, %0.2f ms/msg)"
+                                          render-time-ms (/ render-time-ms count)))))
           (insert (propertize str 'face 'mu4e-system-face 'intangible t))
           (unless (zerop count)
-            (mu4e-message "Found %d matching message%s"
-                          count (if (= 1 count) "" "s")))))
-      ;; if we need to jump to some specific message, do so now
-      (goto-char (point-min))
-      (when mu4e~headers-msgid-target
-        (if (eq (current-buffer) (window-buffer))
-            (mu4e-headers-goto-message-id mu4e~headers-msgid-target)
-          (let* ((pos (mu4e-headers-goto-message-id mu4e~headers-msgid-target)))
-            (when pos
-              (set-window-point (get-buffer-window) pos)))))
-      (when (and mu4e~headers-view-target (mu4e-message-at-point 'noerror))
-        ;; view the message at point when there is one.
-        (mu4e-headers-view-message))
-      (setq mu4e~headers-view-target nil
-            mu4e~headers-msgid-target nil)
-      (when (mu4e~headers-docid-at-point)
-        (mu4e~headers-highlight (mu4e~headers-docid-at-point))))
+            (mu4e-message "%s" msg))
 
+          ;; if we need to jump to some specific message, do so now
+          (goto-char (point-min))
+          (when mu4e~headers-msgid-target
+            (if (eq (current-buffer) (window-buffer))
+                (mu4e-headers-goto-message-id mu4e~headers-msgid-target)
+              (let* ((pos (mu4e-headers-goto-message-id mu4e~headers-msgid-target)))
+                (when pos
+                  (set-window-point (get-buffer-window) pos)))))
+          (when (and mu4e~headers-view-target (mu4e-message-at-point 'noerror))
+            ;; view the message at point when there is one.
+            (mu4e-headers-view-message))
+          (setq mu4e~headers-view-target nil
+                mu4e~headers-msgid-target nil)
+          (when (mu4e~headers-docid-at-point)
+            (mu4e~headers-highlight (mu4e~headers-docid-at-point)))))
     ;; run-hooks
-    (run-hooks 'mu4e-headers-found-hook)))
+    (run-hooks 'mu4e-headers-found-hook))))
 
 
 ;;; Marking

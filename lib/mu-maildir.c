@@ -779,12 +779,24 @@ get_new_basename (void)
 				g_get_host_name ());
 }
 
+static char*
+find_path_separator(const char *path)
+{
+	const char *cur;
+	for (cur = &path[strlen(path)-1]; cur > path; --cur) {
+		if ((*cur == ':' || *cur == '!' || *cur == ';') &&
+		    (cur[1] == '2' && cur[2] == ',')) {
+			return (char*)cur;
+		}
+	}
+	return NULL;
+}
 
 char*
 mu_maildir_get_new_path (const char *oldpath, const char *new_mdir,
 			 MuFlags newflags, gboolean new_name)
 {
-	char *mfile, *mdir, *custom_flags, *newpath, flags_sep = ':';
+	char *mfile, *mdir, *custom_flags, *cur, *newpath, flags_sep = ':';
 
 	g_return_val_if_fail (oldpath, NULL);
 
@@ -795,25 +807,26 @@ mu_maildir_get_new_path (const char *oldpath, const char *new_mdir,
 	if (!mdir)
 		return NULL;
 
-	if (new_name)
+        /* determine the name of the location of the flag separator */
+
+	if (new_name) {
 		mfile = get_new_basename ();
-	else {
-		/* determine the name of the mailfile, stripped of its flags, as
-		 * well as any custom (non-standard) flags */
-		char *cur;
+		cur = find_path_separator (oldpath);
+		if (cur) {
+			/* preserve the existing flags separator
+			 * in the new file name */
+			flags_sep = *cur;
+		}
+	} else {
 		mfile = g_path_get_basename (oldpath);
-		for (cur = &mfile[strlen(mfile)-1]; cur > mfile; --cur) {
-			if ((*cur == ':' || *cur == '!' || *cur == ';') &&
-			    (cur[1] == '2' && cur[2] == ',')) {
-				/* get the custom flags (if any) */
-				custom_flags =
-					mu_flags_custom_from_str (cur + 3);
-				/* preserve the existing flags separator
-				 * in the new file name */
-				flags_sep = *cur;
-				cur[0] = '\0'; /* strip the flags */
-				break;
-			}
+		cur = find_path_separator (mfile);
+		if (cur) {
+			/* get the custom flags (if any) */
+			custom_flags = mu_flags_custom_from_str (cur + 3);
+			/* preserve the existing flags separator
+			 * in the new file name */
+			flags_sep = *cur;
+			cur[0] = '\0'; /* strip the flags */
 		}
 	}
 
@@ -884,11 +897,18 @@ msg_move_check_post (const char *src, const char *dst, GError **err)
 	/* double check -- is the target really there? */
 	if (access (dst, F_OK) != 0)
 		return mu_util_g_set_error
-			(err, MU_ERROR_FILE, "can't find target (%s)",  dst);
+			(err, MU_ERROR_FILE, "can't find target (%s->%s)", src, dst);
 
-	if (access (src, F_OK) == 0)
+	if (access (src, F_OK) == 0) {
+                if (g_strcmp0(src, dst) == 0) {
+                        g_warning ("moved %s to itself", src);
+                        return TRUE;
+                }
+
 		return mu_util_g_set_error
-			(err, MU_ERROR_FILE, "source still there (%s)", src);
+			(err, MU_ERROR_FILE, "source still there (%s->%s)",
+                         src, dst);
+        }
 
 	return TRUE;
 }
@@ -924,7 +944,7 @@ msg_move (const char* src, const char *dst, GError **err)
 
 	if (errno != EXDEV) /* some unrecoverable error occurred */
 		return mu_util_g_set_error
-			(err, MU_ERROR_FILE,"error moving %s to %s", src, dst);
+			(err, MU_ERROR_FILE, "error moving %s -> %s", src, dst);
 
 	/* he EXDEV case -- source and target live on different filesystems */
 	return msg_move_g_file (src, dst, err);

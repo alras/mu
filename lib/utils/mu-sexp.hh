@@ -24,7 +24,6 @@
 #include <iterator>
 #include <string>
 #include <vector>
-#include <deque>
 #include <type_traits>
 
 #include "utils/mu-utils.hh"
@@ -49,8 +48,9 @@ struct Sexp {
          */
         Sexp():type_{Type::Empty}{}
 
-        /// Underlying data type for list
-        using Seq = std::deque<Sexp>;
+        // Underlying data type for list; we'd like to use std::dequeu here,
+        // but that does not compile with libc++ (it does with libstdc++)
+        using Seq = std::vector<Sexp>;
 
         /**
          * Make a sexp out of an s-expression string.
@@ -104,11 +104,19 @@ struct Sexp {
         }
 
         /**
-         * Convert a Sexp::Node to its string representation
+         * Convert a Sexp::Node to its S-expression string representation
          *
          * @return the string representation
          */
-        std::string to_string() const;
+        std::string to_sexp_string() const;
+
+
+        /**
+         * Convert a Sexp::Node to its JSON string representation
+         *
+         * @return the string representation
+         */
+        std::string to_json_string() const;
 
         /**
          * Return the type of this Node.
@@ -341,7 +349,7 @@ operator<<(std::ostream& os, Sexp::Type id)
 static inline std::ostream&
 operator<<(std::ostream& os, const Sexp& sexp)
 {
-        os << sexp.to_string();
+        os << sexp.to_sexp_string();
         return os;
 }
 

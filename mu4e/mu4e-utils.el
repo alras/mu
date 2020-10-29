@@ -63,15 +63,23 @@
     (kill-new path)
     (mu4e-message "Saved '%s' to kill-ring" path)))
 
-(defun mu4e-user-mail-address-p (addr)
-  "If ADDR is one of user's e-mail addresses return t, nil otherwise.
-User's addresses are set in `(mu4e-personal-addresses)'.  Case
-insensitive comparison is used."
-  (when (and addr (mu4e-personal-addresses)
-             (cl-find addr (mu4e-personal-addresses)
-                      :test (lambda (s1 s2)
-                              (eq t (compare-strings s1 nil nil s2 nil nil t)))))
-    t))
+(defun mu4e-personal-address-p (addr)
+  "Is ADDR a personal address?
+Evaluate to nil if ADDR matches any of the personal addresses.
+Uses (mu4e-personal-addresses) for the addresses with both the plain
+addresses and /regular expressions/."
+  (when addr
+    (seq-find
+     (lambda (m)
+       (if (string-match "/\\(.*\\)/" m)
+           (let ((rx (match-string 1 m))
+                 (case-fold-search t))
+             (if (string-match rx addr) t nil))
+         (eq t (compare-strings addr nil nil m nil nil 'case-insensitive))))
+     (mu4e-personal-addresses))))
+
+(define-obsolete-function-alias 'mu4e-user-mail-address-p
+  'mu4e-personal-address-p "1.5.5")
 
 (defmacro with~mu4e-context-vars (context &rest body)
   "Evaluate BODY, with variables let-bound for CONTEXT (if any).
@@ -703,9 +711,15 @@ completion; for testing/debugging."
     (when mu4e~contacts
       (insert (format "number of contacts cached: %d\n\n"
                       (hash-table-count mu4e~contacts)))
-      (maphash (lambda(key _val)
-                 (insert (format "%S\n" key))) mu4e~contacts)))
-  (pop-to-buffer "*mu4e-contacts-info*"))
+      (let ((contacts))
+        (maphash (lambda (addr rank)
+                   (setq contacts (cons (cons rank addr) contacts))) mu4e~contacts)
+        (setq contacts (sort contacts
+                             (lambda(cell1 cell2) (< (car cell1) (car cell2)))))
+        (dolist (contact contacts)
+          (insert (format "%s\n" (cdr contact))))))
+
+    (pop-to-buffer "*mu4e-contacts-info*")))
 
 (defun mu4e~check-requirements ()
   "Check for the settings required for running mu4e."
