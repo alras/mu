@@ -15,7 +15,7 @@
 ## Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 AC_PREREQ([2.68])
-AC_INIT([mu],[1.5.6],[https://github.com/djcb/mu/issues],[mu])
+AC_INIT([mu],[1.5.7],[https://github.com/djcb/mu/issues],[mu])
 AC_COPYRIGHT([Copyright (C) 2008-2020 Dirk-Jan C. Binnema])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([mu/mu.cc])
@@ -211,23 +211,38 @@ AM_CONDITIONAL(HAVE_WEBKIT, [test "x$have_webkit" = "xyes"])
 AM_CONDITIONAL(BUILD_GUI,[test "x$have_webkit" = "xyes" -a "x$have_gtk" = "xyes"])
 ###############################################################################
 
+################################################################################
+# should we try to build an emacs dynamic module?
+AC_CHECK_HEADER([emacs-module.h],[
+  AC_DEFINE([HAVE_EMACS_MODULE_H],[1], [Whether we have the emacs-module header])],
+  AC_MSG_NOTICE([emacs-module.h not found; not building module])
+)
+AM_CONDITIONAL([BUILD_EMACS_MODULE],[test "x$ac_cv_header_emacs_module_h" != "x"])
+################################################################################
+
 ###############################################################################
-# build with guile2.2 when available and not disabled.
+# build with guile 3.0/2.2 when available and not disabled.
 AC_ARG_ENABLE([guile], AS_HELP_STRING([--disable-guile],[Disable guile]))
 AS_IF([test "x$enable_guile" != "xno"],[
-  PKG_CHECK_MODULES(GUILE22, guile-2.2, [have_guile22=yes],[have_guile22=no])
-  # this is a bit hacky; GUILE_PKG
-  AS_IF([test "x$have_guile22" = "xyes"],[
-    GUILE_PKG([2.2])
-    GUILE_PROGS
-    GUILE_FLAGS
-    AC_DEFINE_UNQUOTED([GUILE_BINARY],"$GUILE",[guile binary])
-    AC_DEFINE(BUILD_GUILE,[1], [Do we support Guile?])
-    AC_SUBST(GUILE_SNARF, [guile-snarf])
-    guile_version=$($PKG_CONFIG guile-2.2 --modversion)
-  ])
+
+  PKG_CHECK_MODULES(GUILE, [guile-3.0], [have_guile=yes],[
+    PKG_CHECK_MODULES(GUILE, [guile-2.2], [have_guile=yes], [have_guile=no])])
+
+    AS_IF([test "x$have_guile" = "xyes"],[
+      GUILE_PKG([3.0 2.2])
+      GUILE_PROGS
+      GUILE_FLAGS
+      AC_DEFINE_UNQUOTED([GUILE_BINARY],"$GUILE",[guile binary])
+      AC_DEFINE(BUILD_GUILE,[1], [Do we support Guile?])
+
+      snarf=guile-snarf${GUILE_EFFECTIVE_VERSION}
+      AC_CHECK_PROG(GUILE_SNARF,[${snarf}],[${snarf}], [no])
+      guile_version=$($PKG_CONFIG guile-$GUILE_EFFECTIVE_VERSION --modversion)
+   ])
 ])
-AM_CONDITIONAL(BUILD_GUILE,[test "x$have_guile22" = "xyes"])
+
+AM_CONDITIONAL(BUILD_GUILE,[test "x$have_guile" = "xyes" -a \
+                                 "x$ac_cv_prog_GUILE_SNARF" != "xno"])
 ###############################################################################
 
 ###############################################################################
@@ -256,7 +271,6 @@ mu/mu-memcheck
 lib/Makefile
 lib/doxyfile
 lib/utils/Makefile
-lib/query/Makefile
 lib/index/Makefile
 mu4e/Makefile
 mu4e/mu4e-meta.el
@@ -297,13 +311,13 @@ AM_COND_IF([BUILD_GUILE],[
 echo "Guile version                        : $guile_version"
 ])
 
-if test "x$build_mu4e" = "xyes"; then
+AS_IF([test "x$build_mu4e" = "xyes"],[
+echo "Build mu4e                           : yes"
 echo "Emacs version                        : $emacs_version"
-fi
-
-echo
-echo "Have wordexp                         : $ac_cv_header_wordexp_h"
-echo "Build mu4e emacs frontend            : $build_mu4e"
+AM_COND_IF([BUILD_EMACS_MODULE],[
+echo "Build emacs module                   : yes"],[
+echo "Build emacs module                   : no"
+])])
 
 AM_COND_IF([BUILD_GUI],[
 echo "Build 'mug' toy-ui (gtk+/webkit)     : yes"],[
