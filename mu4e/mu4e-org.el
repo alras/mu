@@ -43,7 +43,8 @@ the current query; otherwise, it links to the message at point.")
 (defun mu4e~org-store-link-query ()
   "Store a link to a mu4e query."
   (setq org-store-link-plist nil) ; reset
-  (org-store-link-props
+;;  (org-store-link-props
+  (org-link-store-props
    :type        "mu4e"
    :query       (mu4e-last-query)
    :date        (format-time-string "%FT%T") ;; avoid error
@@ -66,7 +67,8 @@ the current query; otherwise, it links to the message at point.")
          (date     (format-time-string "%FT%T" (plist-get msg :date)))
          (msgid    (or (plist-get msg :message-id)
                        (mu4e-error "Cannot link message without message-id"))))
-    (org-store-link-props
+;;    (org-store-link-props
+    (org-link-store-props
      :type                     "mu4e"
      :date                     date
      :from                     (when from
