@@ -94,7 +94,9 @@ valid even after moving the message around."
         (mu4e~org-store-link-query)
       (when (mu4e-message-at-point)
         (mu4e~org-store-link-message)))))
-                                         ;
+
+
+                                        ;
 (defun mu4e-org-open (link)
   "Open the org LINK.
 Open the mu4e message (for links starting with 'msgid:') or run
