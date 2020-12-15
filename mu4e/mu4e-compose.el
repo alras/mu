@@ -361,10 +361,12 @@ Message-ID."
             nil t))
 
 (defun mu4e~compose-before-save-hook-fn ()
-  ;; replace the date
+  "Add the message-id if necessary and update the date."
   (save-excursion
-    (message-remove-header "Date")
-    (message-generate-headers '(Date Message-ID))
+    (save-restriction
+      (message-narrow-to-headers)
+      (unless (message-fetch-field "Message-ID")
+        (message-generate-headers '(Date Message-ID))))
     (save-match-data
       (mu4e~draft-remove-mail-header-separator))))
 
@@ -795,11 +797,11 @@ appropriate flag at the message forwarded or replied-to."
     (mu4e~proc-remove docid))
   ;; kill any remaining buffers for the draft file, or they will hang around...
   ;; this seems a bit hamfisted...
-  (dolist (buf (buffer-list))
-    (when (and (buffer-file-name buf)
-               (string= (buffer-file-name buf) path))
-      (if message-kill-buffer-on-exit
-          (kill-buffer buf))))
+  (when message-kill-buffer-on-exit
+    (dolist (buf (buffer-list))
+      (and (buffer-file-name buf)
+           (string= (buffer-file-name buf) path)
+           (kill-buffer buf))))
   (mu4e~switch-back-to-mu4e-buffer)
   (mu4e-message "Message sent"))
 
