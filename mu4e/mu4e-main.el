@@ -32,12 +32,18 @@
 
 ;;; Mode
 
-(defvar mu4e-main-buffer-hide-personal-addresses nil
+(define-obsolete-variable-alias
+  'mu4e-main-buffer-hide-personal-addresses
+  'mu4e-main-hide-personal-addresses "1.5.7")
+
+(defvar mu4e-main-hide-personal-addresses nil
   "Whether to hide the personal address in the main view. This
   can be useful to avoid the noise when there are many.
 
   This also hides the warning if your `user-mail-address' is not
 part of the personal addresses.")
+
+
 
 (defvar mu4e-main-hide-fully-read nil
   "When set to t, do not hide bookmarks or maildirs that have
@@ -125,7 +131,8 @@ clicked."
            for bm in bmks
            for key = (string (plist-get bm :key))
            for name = (plist-get bm :name)
-           for query = (plist-get bm :query)
+           for query = (funcall (or mu4e-query-rewrite-function #'identity)
+                                (plist-get bm :query))
            for qcounts = (and (stringp query)
                               (cl-loop for q in queries
                                        when (string=
@@ -270,10 +277,10 @@ When REFRESH is non nil refresh infos from server."
        (mu4e~key-val "maildir" (mu4e-root-maildir))
        (mu4e~key-val "in store"
                      (format "%d" (plist-get mu4e~server-props :doccount)) "messages")
-       (if mu4e-main-buffer-hide-personal-addresses ""
+       (if mu4e-main-hide-personal-addresses ""
          (mu4e~key-val "personal addresses" (if addrs (mapconcat #'identity addrs ", "  ) "none"))))
 
-      (if mu4e-main-buffer-hide-personal-addresses ""
+      (if mu4e-main-hide-personal-addresses ""
         (unless (mu4e-personal-address-p user-mail-address)
           (mu4e-message (concat
                          "Tip: `user-mail-address' ('%s') is not part "
@@ -317,8 +324,8 @@ When REFRESH is non nil refresh infos from server."
   (let ((buf (get-buffer-create mu4e-main-buffer-name)))
     (if (eq mu4e-split-view 'single-window)
         (if (buffer-live-p (mu4e-get-headers-buffer))
-	    (switch-to-buffer (mu4e-get-headers-buffer))
-	  (mu4e~main-menu))
+            (switch-to-buffer (mu4e-get-headers-buffer))
+          (mu4e~main-menu))
       ;; `mu4e~main-view' is called from `mu4e~start', so don't call it
       ;; a second time here i.e. do not refresh unless specified
       ;; explicitly with REFRESH arg.

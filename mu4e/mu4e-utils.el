@@ -826,7 +826,9 @@ When successful, call FUNC (if non-nil) afterwards."
   (setq mu4e-pong-func (lambda (info) (mu4e~pong-handler info func)))
   (mu4e~proc-ping
    (mapcar ;; send it a list of queries we'd like to see read/unread info for
-    (lambda (bm) (plist-get bm :query))
+    (lambda (bm)
+      (funcall (or mu4e-query-rewrite-function #'identity)
+               (plist-get bm :query)))
     ;; exclude bookmarks that are not strings, and with certain flags
     (seq-filter (lambda (bm)
                   (and (stringp (plist-get bm :query))
@@ -854,10 +856,16 @@ When successful, call FUNC (if non-nil) afterwards."
   ;; kill all mu4e buffers
   (mapc
    (lambda (buf)
-     (with-current-buffer buf
-       (when (member major-mode
-                     '(mu4e-headers-mode mu4e-view-mode mu4e-main-mode))
-         (kill-buffer))))
+     ;; When using mu4e-view-use-gnus, the view buffer has the kill-buffer-hook
+     ;; function mu4e~view-kill-buffer-hook-fn which kills the mm-* buffers
+     ;; created by Gnus' article mode.  Those have been returned by
+     ;; `buffer-list' but might already be deleted in case the view buffer has
+     ;; been killed first.  So we need a `buffer-live-p' check here.
+     (when (buffer-live-p buf)
+       (with-current-buffer buf
+         (when (member major-mode
+                       '(mu4e-headers-mode mu4e-view-mode mu4e-main-mode))
+           (kill-buffer)))))
    (buffer-list)))
 
 (defun mu4e~maildirs-with-query ()
