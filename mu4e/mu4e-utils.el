@@ -1037,10 +1037,8 @@ in the background; otherwise, pop up a window."
     (when (process-live-p proc)
       (kill-process proc t))))
 
-(define-obsolete-function-alias 'mu4e-interrupt-update-mail
-  'mu4e-kill-update-mail)
+(define-obsolete-function-alias 'mu4e-interrupt-update-mail 'mu4e-kill-update-mail "23.8")
 
-
 ;;; Logging / debugging
 
 (defconst mu4e~log-max-size 1000000
