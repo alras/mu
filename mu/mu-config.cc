@@ -26,13 +26,12 @@
 
 #include "mu-config.hh"
 #include "mu-cmd.hh"
-#include "mu-msg.h"
 
+using namespace Mu;
 
 static MuConfig MU_CONFIG;
 
 #define color_maybe(C) (MU_CONFIG.nocolor ? "" : (C))
-
 
 static MuConfigFormat
 get_output_format (const char *formatstr)
@@ -78,7 +77,7 @@ get_output_format (const char *formatstr)
 
 
 static void
-set_group_mu_defaults (void)
+set_group_mu_defaults ()
 {
 	/* If muhome is not set, we use the XDG Base Directory Specification
 	 * locations. */
@@ -95,7 +94,7 @@ set_group_mu_defaults (void)
 }
 
 static GOptionGroup*
-config_options_group_mu (void)
+config_options_group_mu ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -103,7 +102,7 @@ config_options_group_mu (void)
 		 "print debug output to standard error (false)", NULL},
 		{"quiet", 'q', 0, G_OPTION_ARG_NONE, &MU_CONFIG.quiet,
 		 "don't give any progress information (false)", NULL},
-		{"version", 0, 0, G_OPTION_ARG_NONE, &MU_CONFIG.version,
+		{"version", 'V', 0, G_OPTION_ARG_NONE, &MU_CONFIG.version,
 		 "display version and copyright information (false)", NULL},
 		{"muhome", 0, 0, G_OPTION_ARG_FILENAME, &MU_CONFIG.muhome,
 		 "specify an alternative mu directory", "<dir>"},
@@ -126,7 +125,7 @@ config_options_group_mu (void)
 }
 
 static void
-set_group_init_defaults (void)
+set_group_init_defaults ()
 {
 	if (!MU_CONFIG.maildir)
 		MU_CONFIG.maildir = mu_util_guess_maildir();
@@ -135,7 +134,7 @@ set_group_init_defaults (void)
 }
 
 static GOptionGroup*
-config_options_group_init (void)
+config_options_group_init ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -179,7 +178,7 @@ index_post_parse_func (GOptionContext *context, GOptionGroup *group,
 
 
 static GOptionGroup*
-config_options_group_index (void)
+config_options_group_index ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -206,15 +205,14 @@ config_options_group_index (void)
 }
 
 static void
-set_group_find_defaults (void)
+set_group_find_defaults ()
 {
-	/* note, when no fields are specified, we use
-	 * date-from-subject, and sort descending by date. If fields
-	 * *are* specified, we sort in ascending order. */
+	/* note, when no fields are specified, we use date-from-subject */
 	if (!MU_CONFIG.fields || !*MU_CONFIG.fields) {
 		MU_CONFIG.fields = g_strdup ("d f s");
-		if (!MU_CONFIG.sortfield)
+		if (!MU_CONFIG.sortfield) {
 			MU_CONFIG.sortfield = g_strdup ("d");
+		}
 	}
 
 	if (!MU_CONFIG.formatstr) /* by default, use plain output */
@@ -227,7 +225,7 @@ set_group_find_defaults (void)
 }
 
 static GOptionGroup*
-config_options_group_find (void)
+config_options_group_find ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -277,7 +275,7 @@ config_options_group_find (void)
 }
 
 static GOptionGroup *
-config_options_group_mkdir (void)
+config_options_group_mkdir ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -297,7 +295,7 @@ config_options_group_mkdir (void)
 }
 
 static void
-set_group_cfind_defaults (void)
+set_group_cfind_defaults ()
 {
 	if (!MU_CONFIG.formatstr) /* by default, use plain output */
 		MU_CONFIG.format = MU_CONFIG_FORMAT_PLAIN;
@@ -306,7 +304,7 @@ set_group_cfind_defaults (void)
 }
 
 static GOptionGroup *
-config_options_group_cfind (void)
+config_options_group_cfind ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -328,7 +326,7 @@ config_options_group_cfind (void)
 }
 
 static GOptionGroup *
-config_options_group_script (void)
+config_options_group_script ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -346,7 +344,7 @@ config_options_group_script (void)
 }
 
 static void
-set_group_view_defaults (void)
+set_group_view_defaults ()
 {
 	if (!MU_CONFIG.formatstr) /* by default, use plain output */
 		MU_CONFIG.format = MU_CONFIG_FORMAT_PLAIN;
@@ -357,7 +355,7 @@ set_group_view_defaults (void)
 
 /* crypto options are used in a few different commands */
 static GOptionEntry*
-crypto_option_entries (void)
+crypto_option_entries ()
 {
 	static GOptionEntry entries[] = {
 		{"auto-retrieve", 'r', 0, G_OPTION_ARG_NONE,
@@ -374,7 +372,7 @@ crypto_option_entries (void)
 }
 
 static GOptionGroup *
-config_options_group_view (void)
+config_options_group_view ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -399,7 +397,7 @@ config_options_group_view (void)
 }
 
 static void
-set_group_extract_defaults (void)
+set_group_extract_defaults ()
 {
 	if (!MU_CONFIG.targetdir)
 		MU_CONFIG.targetdir = g_strdup (".");
@@ -409,7 +407,7 @@ set_group_extract_defaults (void)
 
 
 static GOptionGroup*
-config_options_group_extract (void)
+config_options_group_extract ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -440,7 +438,7 @@ config_options_group_extract (void)
 
 
 static GOptionGroup*
-config_options_group_verify (void)
+config_options_group_verify ()
 {
 	GOptionGroup *og;
 	og = g_option_group_new("verify",
@@ -453,7 +451,7 @@ config_options_group_verify (void)
 
 
 static GOptionGroup*
-config_options_group_server (void)
+config_options_group_server ()
 {
 	GOptionGroup *og;
 	GOptionEntry entries[] = {
@@ -627,7 +625,7 @@ get_help_string (MuConfigCmd cmd, gboolean long_help)
 
 
 void
-mu_config_show_help (MuConfigCmd cmd)
+Mu::mu_config_show_help (MuConfigCmd cmd)
 {
 	GOptionContext *ctx;
 	GOptionGroup *group;
@@ -655,7 +653,7 @@ mu_config_show_help (MuConfigCmd cmd)
 }
 
 static gboolean
-cmd_help (void)
+cmd_help ()
 {
 	MuConfigCmd cmd;
 
@@ -725,15 +723,13 @@ parse_params (int *argcp, char ***argvp, GError **err)
 
 
 MuConfig*
-mu_config_init (int *argcp, char ***argvp, GError **err)
+Mu::mu_config_init (int *argcp, char ***argvp, GError **err)
 {
 	g_return_val_if_fail (argcp && argvp, NULL);
 
 	memset (&MU_CONFIG, 0, sizeof(MU_CONFIG));
 
-	MU_CONFIG.maxnum = -1; /* By default, output all matching entries. */
-
-	if (!parse_cmd (argcp, argvp, err))
+        if (!parse_cmd (argcp, argvp, err))
 		goto errexit;
 
 	if (!parse_params(argcp, argvp, err))
@@ -757,7 +753,7 @@ errexit:
 
 
 void
-mu_config_uninit (MuConfig *opts)
+Mu::mu_config_uninit (MuConfig *opts)
 {
 	if (!opts)
 		return;
@@ -782,7 +778,7 @@ mu_config_uninit (MuConfig *opts)
 }
 
 size_t
-mu_config_param_num (const MuConfig *opts)
+Mu::mu_config_param_num (const MuConfig *opts)
 {
 	size_t n;
 
@@ -794,7 +790,7 @@ mu_config_param_num (const MuConfig *opts)
 
 
 MuMsgOptions
-mu_config_get_msg_options (const MuConfig *muopts)
+Mu::mu_config_get_msg_options (const MuConfig *muopts)
 {
 	int opts;
 

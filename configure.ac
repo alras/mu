@@ -1,4 +1,4 @@
-## Copyright (C) 2008-2020 Dirk-Jan C. Binnema <djcb@djcbsoftware.nl>
+## Copyright (C) 2008-2021 Dirk-Jan C. Binnema <djcb@djcbsoftware.nl>
 ##
 ## This program is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 ## Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 AC_PREREQ([2.68])
-AC_INIT([mu],[1.5.7],[https://github.com/djcb/mu/issues],[mu])
+AC_INIT([mu],[1.5.8],[https://github.com/djcb/mu/issues],[mu])
 AC_COPYRIGHT([Copyright (C) 2008-2020 Dirk-Jan C. Binnema])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([mu/mu.cc])
@@ -23,9 +23,6 @@ AC_CONFIG_SRCDIR([mu/mu.cc])
 # autotools/libtool setup. you can try to comment this out
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
-
-m4_ifdef([AX_IS_RELEASE],[AX_IS_RELEASE([git-directory])])
-m4_ifdef([AX_CHECK_ENABLE_DEBUG],[AX_CHECK_ENABLE_DEBUG([yes])])
 
 AM_INIT_AUTOMAKE([1.14 foreign no-dist-gzip tar-ustar dist-xz])
 
@@ -48,10 +45,12 @@ AC_HEADER_STDC
 extra_flags="-Wformat-security                                        \
              -Wstack-protector                                        \
              -Wstack-protector-all                                    \
-             -Wno-cast-function-type"
+             -Wno-cast-function-type                                  \
+             -Wno-bad-function-cast"
 
 AX_CXX_COMPILE_STDCXX_14
-m4_ifdef([AX_COMPILER_FLAGS],[AX_COMPILER_FLAGS(,,[yes],${extra_flags})])
+AX_COMPILER_FLAGS_CXXFLAGS([],[],[${extra_cflags}])
+AX_APPEND_COMPILE_FLAGS([-Wno-inline ],[CXXFLAGS])
 AX_VALGRIND_CHECK
 
 LT_INIT
@@ -75,6 +74,7 @@ AS_IF([test "x$use_asan" = "xyes"],[
   AC_SUBST(ASAN_CXXFLAGS,"-fsanitize=address -static-libasan -fno-omit-frame-pointer")
   AC_SUBST(ASAN_LDFLAGS, "-fsanitize=address -static-libasan -fno-omit-frame-pointer")
 ])
+
 
 # check for makeinfo
 AC_CHECK_PROG(have_makeinfo,makeinfo,yes,no)

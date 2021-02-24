@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2020 Dirk-Jan C. Binnema <djcb@djcbsoftware.nl>
+** Copyright (C) 2021 Dirk-Jan C. Binnema <djcb@djcbsoftware.nl>
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -20,9 +20,7 @@
 #ifndef __MU_STORE_HH__
 #define __MU_STORE_HH__
 
-#include <mu-msg.h>
-
-#ifdef __cplusplus
+#include <mu-msg.hh>
 
 #include <string>
 #include <vector>
@@ -37,12 +35,13 @@
 #include <index/mu-indexer.hh>
 
 namespace Mu {
-
 class Store {
 public:
-        using Id = unsigned;    /**< Id for a message in the store (internally,
-                                 * corresponds to a Xapian document-id) */
+        using Id = Xapian::docid;          /**< Id for a message in the store */
         static constexpr Id InvalidId = 0; /**< Invalid  store id */
+
+        static constexpr size_t MaxTermLength = 240; /**< Maximum length of a term,
+          http://article.gmane.org/gmane.comp.search.xapian.general/3656 */
 
         /**
          * Construct a store for an existing document database
@@ -51,7 +50,6 @@ public:
          * @param readonly whether to open the database in read-only mode
          */
         Store (const std::string& path, bool readonly=true);
-
 
         struct Config {
                 size_t max_message_size{};
@@ -72,6 +70,16 @@ public:
                const StringVec& personal_addresses, const Config& conf);
 
         /**
+         * Construct an in-memory, writeable store for testing
+         *
+         * @param maildir maildir to use for this store
+         * @param personal_addresses addresses that should be recognized as
+         * 'personal' for identifying personal messages.
+         */
+        Store (const std::string& maildir,
+               const StringVec& personal_addresses, const Config& conf);
+
+        /**
          * DTOR
          */
         ~Store();
@@ -83,6 +91,7 @@ public:
 
                 bool        read_only;          /**< Is the database opened read-only? */
                 size_t      batch_size;         /**< Maximum database transaction batch size */
+                bool        in_memory;          /**< Is this an in-memory database (for testing)?*/
 
                 std::string root_maildir;       /**<  Absolute path to the top-level maildir */
 
@@ -119,10 +128,9 @@ public:
          */
         Xapian::WritableDatabase& writable_database();
 
-
         /**
-         * Get the Indexer associated with this store. It is an error
-         * to call this on a read-only store.
+         * Get the Indexer associated with this store. It is an error to call
+         * this on a read-only store.
          *
          * @return the indexer.
          */
@@ -143,7 +151,7 @@ public:
          * @param msg a message
          * @param id the id for this message
          *
-         * @return false in case of failure; true ottherwise.
+         * @return false in case of failure; true otherwise.
          */
         bool update_message (MuMsg *msg, Id id);
 
@@ -292,80 +300,5 @@ private:
 };
 
 } // namespace Mu
-
-
-#endif /*__cplusplus*/
-
-#include <glib.h>
-#include <inttypes.h>
-#include <utils/mu-util.h>
-#include <mu-contacts.hh>
-
-G_BEGIN_DECLS
-
-struct MuStore_;
-typedef struct MuStore_ MuStore;
-
-/* http://article.gmane.org/gmane.comp.search.xapian.general/3656 */
-#define MU_STORE_MAX_TERM_LENGTH (240)
-
-/**
- * create a new read-only Xapian store, for querying documents
- *
- * @param path the path to the database
- * @param err to receive error info or NULL. err->code is MuError value
- *
- * @return a new MuStore object with ref count == 1, or NULL in case of error;
- * free with mu_store_unref
- */
-MuStore* mu_store_new_readable (const char* xpath, GError **err)
-		   G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
-
-/**
- * increase the reference count for this store with 1
- *
- * @param store a valid store object
- *
- * @return the same store with increased ref count, or NULL in case of
- * error
- */
-MuStore* mu_store_ref (MuStore *store);
-
-/**
- * decrease the reference count for this store with 1
- *
- * @param store a valid store object
- *
- * @return NULL
- */
-MuStore* mu_store_unref (MuStore *store);
-
-/**
- * get the version of the xapian database (ie., the version of the
- * 'schema' we are using). If this version != MU_STORE_SCHEMA_VERSION,
- * it's means we need to a full reindex.
- *
- * @param store the store to inspect
- *
- * @return the version of the database as a newly allocated string
- * (free with g_free); if there is no version yet, it will return NULL
- */
-const char* mu_store_schema_version (const MuStore* store);
-
-
-/**
- * get the numbers of documents in the database
- *
- * @param index a valid MuStore instance
- * @param err to receive error info or NULL. err->code is MuError value
- *
- * @return the number of documents in the database; (unsigned)-1 in
- * case of error
- */
-unsigned mu_store_count (const MuStore *store, GError **err);
-
-#define MU_STORE_INVALID_DOCID 0
-
-G_END_DECLS
 
 #endif /* __MU_STORE_HH__ */
